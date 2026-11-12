@@ -18,17 +18,17 @@ async def feed(
     uid, token, user = await sign_in(x_email, x_password)
     limit = max(1, min(limit, PAGE_MAX))
 
-    params = {"orderBy": '"uploadedDate"', "limitToLast": limit}
+    raw = as_dict(await db_get("shorts", token))
+    shorts = [(k, v) for k, v in raw.items() if isinstance(v, dict)]
+    shorts.sort(key=lambda kv: num(kv[1].get("uploadedDate")), reverse=True)
+
     if before:
-        params["endAt"] = before - 1
+        shorts = [kv for kv in shorts if num(kv[1].get("uploadedDate")) < before]
 
-    raw = as_dict(await db_get("shorts", token, params))
-    batch = [(k, v) for k, v in raw.items() if isinstance(v, dict)]
-    batch.sort(key=lambda kv: num(kv[1].get("uploadedDate")), reverse=True)
+    page = shorts[:limit]
+    next_before = num(page[-1][1].get("uploadedDate")) if len(shorts) > limit else None
 
-    items = [view_short(k, v, uid) for k, v in batch]
-    next_before = num(batch[-1][1].get("uploadedDate")) if len(batch) >= limit else None
-    return {"shorts": items, "nextBefore": next_before}
+    return {"shorts": [view_short(k, v, uid) for k, v in page], "nextBefore": next_before}
 
 
 @router.get("/{short_id}")
