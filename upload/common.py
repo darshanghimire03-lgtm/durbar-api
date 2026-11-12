@@ -118,8 +118,12 @@ async def prepare(kind, file: UploadFile):
     return data, name, mime
 
 
-def new_id():
-    return secrets.token_urlsafe(9).replace("-", "a").replace("_", "b")
+def cloudinary_error(r):
+    try:
+        message = r.json().get("error", {}).get("message", "")
+    except ValueError:
+        message = ""
+    return f"Cloudinary upload failed: {message}" if message else f"Cloudinary upload failed ({r.status_code})"
 
 
 async def store(kind, data, name):
@@ -136,13 +140,17 @@ async def store(kind, data, name):
                 files={"file": (candidate, data)},
             )
         if r.status_code != 200:
-            raise HTTPException(status_code=502, detail="Cloudinary upload failed")
+            raise HTTPException(status_code=502, detail=cloudinary_error(r))
         body = r.json()
         if body.get("existing"):
             continue
-        if body.get("public_id") != pid:
-            raise HTTPException(status_code=502, detail="Cloudinary preset changed the file name")
-        return make_url(kind, candidate)
+        got = body.get("public_id")
+        if got != pid:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Cloudinary preset changed the file name (expected {pid}, got {got})",
+            )
+        return make_url(kind, candidate), candidate
     raise HTTPException(status_code=409, detail="Too many files with this name")
 
 

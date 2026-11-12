@@ -11,7 +11,8 @@ async def upload_video(file: UploadFile = File(...), x_api_key: str = Header(Non
     data, name, mime = await prepare("vid", file)
     if not mime.startswith("video/"):
         raise HTTPException(status_code=400, detail="Not a video")
-    return {"url": await store("vid", data, name)}
+    url, stored = await store("vid", data, name)
+    return {"url": url, "name": stored}
 
 
 @router.get("/vid/{name}")

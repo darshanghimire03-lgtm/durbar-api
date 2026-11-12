@@ -9,7 +9,8 @@ router = APIRouter()
 async def upload_file(file: UploadFile = File(...), x_api_key: str = Header(None)):
     check_key(x_api_key)
     data, name, mime = await prepare("file", file)
-    return {"url": await store("file", data, name)}
+    url, stored = await store("file", data, name)
+    return {"url": url, "name": stored}
 
 
 @router.get("/file/{name}")

@@ -11,7 +11,8 @@ async def upload_image(file: UploadFile = File(...), x_api_key: str = Header(Non
     data, name, mime = await prepare("img", file)
     if not mime.startswith("image/"):
         raise HTTPException(status_code=400, detail="Not an image")
-    return {"url": await store("img", data, name)}
+    url, stored = await store("img", data, name)
+    return {"url": url, "name": stored}
 
 
 @router.get("/img/{name}")
