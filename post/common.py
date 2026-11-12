@@ -108,18 +108,21 @@ def can_see(user, post):
     return section != "" and section == str(post.get("section", ""))
 
 
-def view_comment(comment_id, c):
+def view_comment(comment_id, c, uid=""):
+    likes = as_dict(c.get("likes"))
     return {
         "commentId": comment_id,
         "uid": c.get("uid", ""),
         "text": c.get("text", ""),
         "imageUrl": c.get("imageUrl", ""),
         "createdAt": num(c.get("createdAt")),
+        "likeCount": sum(1 for v in likes.values() if v),
+        "likedByMe": bool(likes.get(uid)),
     }
 
 
-def comment_list(node):
-    items = [view_comment(k, v) for k, v in as_dict(node).items() if isinstance(v, dict)]
+def comment_list(node, uid=""):
+    items = [view_comment(k, v, uid) for k, v in as_dict(node).items() if isinstance(v, dict)]
     items.sort(key=lambda c: c["createdAt"])
     return items[:MAX_COMMENTS_LIST]
 

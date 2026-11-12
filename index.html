@@ -1,285 +1,324 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Durbar Login</title>
+<title>Durbar Test</title>
 <style>
+  :root { color-scheme: light dark; --bg:#f4f5f7; --card:#fff; --text:#1d2129; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --danger:#dc2626; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --card:#181b22; --text:#e8eaed; --muted:#9aa0aa; --line:#2a2e38; --accent:#60a5fa; --danger:#f87171; } }
   * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-    background: #f4f5f7;
-    color: #1c1e21;
+  body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  .wrap { max-width:640px; margin:0 auto; padding:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  input, button { font:inherit; }
+  input[type=text], input[type=email], input[type=password], input[type=url] {
+    width:100%; padding:10px 12px; margin-bottom:10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text);
   }
-  .card {
-    width: 100%;
-    max-width: 380px;
-    background: #fff;
-    border-radius: 14px;
-    padding: 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.1);
-  }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .sub { font-size: 13px; color: #777; margin: 0 0 18px; }
-  label { display: block; font-size: 13px; color: #555; margin: 12px 0 4px; }
-  input {
-    width: 100%;
-    padding: 11px;
-    border: 1px solid #ccd0d5;
-    border-radius: 8px;
-    font-size: 15px;
-  }
-  input:focus { outline: 2px solid #1a73e8; border-color: transparent; }
-  .pass { position: relative; }
-  .pass input { padding-right: 64px; }
-  .toggle {
-    position: absolute;
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    color: #1a73e8;
-    padding: 6px 8px;
-    font-size: 13px;
-    width: auto;
-    margin: 0;
-  }
-  button {
-    width: 100%;
-    margin-top: 18px;
-    padding: 12px;
-    border: 0;
-    border-radius: 8px;
-    background: #1a73e8;
-    color: #fff;
-    font-size: 15px;
-    cursor: pointer;
-  }
-  button:disabled { opacity: .6; cursor: not-allowed; }
-  button.secondary { background: #e4e6eb; color: #1c1e21; }
-  .msg { font-size: 13px; margin-top: 12px; min-height: 18px; word-break: break-word; }
-  .err { color: #c5221f; }
-  .ok { color: #137333; }
-  .hint { font-size: 12px; color: #888; margin-top: 14px; text-align: center; }
-  .hidden { display: none; }
-  .profile { text-align: center; }
-  .avatar {
-    width: 88px;
-    height: 88px;
-    border-radius: 50%;
-    object-fit: cover;
-    background: #e4e6eb;
-    margin: 0 auto 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 32px;
-    color: #777;
-    overflow: hidden;
-  }
-  .avatar img { width: 100%; height: 100%; object-fit: cover; }
-  .name { font-size: 20px; font-weight: 600; }
-  .role {
-    display: inline-block;
-    margin: 6px 0 14px;
-    padding: 3px 10px;
-    border-radius: 12px;
-    background: #e8f0fe;
-    color: #1a73e8;
-    font-size: 12px;
-    text-transform: capitalize;
-  }
-  .rows { text-align: left; border-top: 1px solid #eee; }
-  .row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #eee; font-size: 14px; }
-  .row span:first-child { color: #777; }
-  .row span:last-child { text-align: right; word-break: break-all; }
+  button { cursor:pointer; border:1px solid var(--line); background:transparent; color:var(--text); padding:7px 12px; border-radius:8px; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button:disabled { opacity:.5; cursor:default; }
+  button.on { color:var(--danger); border-color:var(--danger); }
+  button.del { color:var(--danger); }
+  .bar { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px; }
+  .bar .who { color:var(--muted); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .meta { color:var(--muted); font-size:13px; }
+  .text { white-space:pre-wrap; word-break:break-word; margin:8px 0; }
+  .imgs { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:6px; margin:8px 0; }
+  .imgs img { width:100%; border-radius:8px; display:block; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .comments { margin-top:12px; border-top:1px solid var(--line); padding-top:12px; }
+  .comment { padding:8px 0; border-bottom:1px solid var(--line); }
+  .comment:last-of-type { border-bottom:0; }
+  .comment .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:4px; }
+  .comment img { max-width:200px; border-radius:8px; display:block; margin-top:6px; }
+  .send { display:flex; gap:8px; margin-top:10px; }
+  .send input { margin:0; flex:1; }
+  .err { color:var(--danger); font-size:13px; min-height:18px; margin:4px 0; }
+  .empty { text-align:center; color:var(--muted); padding:20px; }
+  .hidden { display:none; }
 </style>
 </head>
 <body>
-<div class="card">
+<div class="wrap">
 
-  <div id="loginView">
+  <div id="loginView" class="card">
     <h1>Login</h1>
-    <p class="sub">Sign in with your Gmail and password</p>
-
-    <label for="email">Email</label>
-    <input id="email" type="email" placeholder="name@gmail.com" autocomplete="username" inputmode="email">
-
-    <label for="password">Password</label>
-    <div class="pass">
-      <input id="password" type="password" placeholder="Password" autocomplete="current-password">
-      <button type="button" class="toggle" id="toggle">Show</button>
-    </div>
-
-    <button id="submit">Login</button>
-    <div class="msg" id="msg"></div>
-    <div class="hint">Server: <span id="serverLabel"></span></div>
+    <input id="base" type="url" placeholder="API base URL" autocomplete="off">
+    <input id="email" type="email" placeholder="Email" autocomplete="username">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <div id="loginErr" class="err"></div>
+    <button id="loginBtn" class="primary">Log in</button>
   </div>
 
-  <div id="profileView" class="hidden profile">
-    <div class="avatar" id="avatar"></div>
-    <div class="name" id="pName"></div>
-    <div class="role" id="pRole"></div>
-    <div class="rows" id="pRows"></div>
-    <button class="secondary" id="logout">Logout</button>
+  <div id="appView" class="hidden">
+    <div class="bar">
+      <div class="who" id="who"></div>
+      <button id="logoutBtn">Log out</button>
+    </div>
+    <div id="feedErr" class="err"></div>
+    <div id="feed"></div>
+    <div style="text-align:center">
+      <button id="moreBtn" class="hidden">Load more</button>
+    </div>
   </div>
 
 </div>
 
 <script>
-  const BASE = "https://durbar-api-1.onrender.com";
-  const STORE = "durbar_user";
+const DEFAULT_BASE = "https://durbar-api1.onrender.com";
+const $ = (id) => document.getElementById(id);
+const state = { base: "", email: "", password: "", user: null, next: null };
 
-  const loginView = document.getElementById("loginView");
-  const profileView = document.getElementById("profileView");
-  const emailEl = document.getElementById("email");
-  const passEl = document.getElementById("password");
-  const toggleEl = document.getElementById("toggle");
-  const submitEl = document.getElementById("submit");
-  const msgEl = document.getElementById("msg");
-  const logoutEl = document.getElementById("logout");
+function store(key, value) {
+  try { value === null ? sessionStorage.removeItem(key) : sessionStorage.setItem(key, value); } catch (e) {}
+}
+function load(key) {
+  try { return sessionStorage.getItem(key); } catch (e) { return null; }
+}
 
-  document.getElementById("serverLabel").textContent = BASE;
-
-  function setMsg(text, cls) {
-    msgEl.textContent = text;
-    msgEl.className = "msg" + (cls ? " " + cls : "");
+async function api(method, path, body) {
+  const headers = { "X-Email": state.email, "X-Password": state.password };
+  const opts = { method, headers };
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
   }
-
-  function isHttps(url) {
-    try {
-      return new URL(url).protocol === "https:";
-    } catch (e) {
-      return false;
-    }
+  const res = await fetch(state.base + path, opts);
+  let data = null;
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) {
+    if (res.status === 401) { logout(); }
+    const d = data && data.detail;
+    throw new Error(typeof d === "string" ? d : "Request failed (" + res.status + ")");
   }
+  return data;
+}
 
-  function addRow(parent, label, value) {
-    if (value === undefined || value === null || value === "") return;
-    const row = document.createElement("div");
-    row.className = "row";
-    const a = document.createElement("span");
-    a.textContent = label;
-    const b = document.createElement("span");
-    b.textContent = String(value);
-    row.append(a, b);
-    parent.append(row);
-  }
+function el(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  Object.assign(n, props || {});
+  kids.flat().forEach((k) => n.append(k));
+  return n;
+}
 
-  function showProfile(user) {
-    const avatar = document.getElementById("avatar");
-    avatar.innerHTML = "";
-    if (user.profileImageUrl && isHttps(user.profileImageUrl)) {
-      const img = document.createElement("img");
-      img.src = user.profileImageUrl;
-      img.alt = "";
-      img.onerror = () => {
-        avatar.textContent = (user.fullName || "?").charAt(0).toUpperCase();
-      };
-      avatar.append(img);
-    } else {
-      avatar.textContent = (user.fullName || "?").charAt(0).toUpperCase();
-    }
+function when(ms) {
+  return ms ? new Date(ms).toLocaleString() : "";
+}
 
-    document.getElementById("pName").textContent = user.fullName || "";
-    document.getElementById("pRole").textContent = user.role || "";
+function short(uid) {
+  return uid ? "user " + uid.slice(0, 6) : "unknown";
+}
 
-    const rows = document.getElementById("pRows");
-    rows.innerHTML = "";
-    addRow(rows, "UID", user.uid);
-    addRow(rows, "Email", user.email);
-    addRow(rows, "Phone", user.phone);
-    addRow(rows, "Gender", user.gender);
-    if (user.role === "professor") {
-      addRow(rows, "Subject", user.assignedSubject);
-    } else {
-      addRow(rows, "Class", user.classLevel);
-      addRow(rows, "Section", user.section);
-    }
-    if (user.createdAt) addRow(rows, "Joined", new Date(user.createdAt).toLocaleDateString());
-
-    loginView.classList.add("hidden");
-    profileView.classList.remove("hidden");
-  }
-
-  function showLogin() {
-    profileView.classList.add("hidden");
-    loginView.classList.remove("hidden");
-    passEl.value = "";
-    setMsg("", "");
-  }
-
-  async function doLogin() {
-    const email = emailEl.value.trim().toLowerCase();
-    const password = passEl.value;
-
-    if (!email || !password) {
-      setMsg("Enter email and password", "err");
-      return;
-    }
-    if (!/^[a-z0-9._%+\-]+@gmail\.com$/.test(email)) {
-      setMsg("Only @gmail.com emails are accepted", "err");
-      return;
-    }
-
-    submitEl.disabled = true;
-    setMsg("Signing in... (first request may take up to a minute)", "");
-
-    try {
-      const res = await fetch(BASE + "/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setMsg(data.detail || "Login failed (" + res.status + ")", "err");
-      } else {
-        try {
-          localStorage.setItem(STORE, JSON.stringify(data));
-        } catch (e) {}
-        showProfile(data);
-      }
-    } catch (e) {
-      setMsg("Cannot reach server. Check your connection and try again.", "err");
-    }
-
-    submitEl.disabled = false;
-  }
-
-  toggleEl.onclick = () => {
-    const hidden = passEl.type === "password";
-    passEl.type = hidden ? "text" : "password";
-    toggleEl.textContent = hidden ? "Hide" : "Show";
-  };
-
-  submitEl.onclick = doLogin;
-
-  [emailEl, passEl].forEach((el) => {
-    el.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") doLogin();
+async function login() {
+  const base = $("base").value.trim().replace(/\/+$/, "");
+  const email = $("email").value.trim().toLowerCase();
+  const password = $("password").value;
+  $("loginErr").textContent = "";
+  if (!base || !email || !password) { $("loginErr").textContent = "Fill in all fields"; return; }
+  $("loginBtn").disabled = true;
+  try {
+    const res = await fetch(base + "/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
-  });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      const d = data && data.detail;
+      throw new Error(typeof d === "string" ? d : "Login failed (" + res.status + ")");
+    }
+    state.base = base; state.email = email; state.password = password; state.user = data;
+    store("base", base); store("email", email); store("password", password);
+    store("user", JSON.stringify(data));
+    $("password").value = "";
+    showApp();
+  } catch (e) {
+    $("loginErr").textContent = e.message === "Failed to fetch" ? "Cannot reach the server" : e.message;
+  } finally {
+    $("loginBtn").disabled = false;
+  }
+}
 
-  logoutEl.onclick = () => {
+function logout() {
+  ["base", "email", "password", "user"].forEach((k) => store(k, null));
+  state.email = ""; state.password = ""; state.user = null; state.next = null;
+  $("feed").replaceChildren();
+  $("feedErr").textContent = "";
+  $("appView").classList.add("hidden");
+  $("loginView").classList.remove("hidden");
+}
+
+function showApp() {
+  $("loginView").classList.add("hidden");
+  $("appView").classList.remove("hidden");
+  $("who").textContent = (state.user.fullName || state.user.email) + " (" + state.user.role + ")";
+  $("feed").replaceChildren();
+  state.next = null;
+  loadFeed(true);
+}
+
+async function loadFeed(first) {
+  $("feedErr").textContent = "";
+  $("moreBtn").disabled = true;
+  try {
+    const q = "?limit=10" + (!first && state.next ? "&before=" + state.next : "");
+    const data = await api("GET", "/posts" + q);
+    data.posts.forEach((p) => $("feed").append(postCard(p)));
+    if (first && data.posts.length === 0) $("feed").append(el("div", { className: "empty", textContent: "No posts yet" }));
+    state.next = data.nextBefore;
+    $("moreBtn").classList.toggle("hidden", !state.next);
+  } catch (e) {
+    $("feedErr").textContent = e.message;
+  } finally {
+    $("moreBtn").disabled = false;
+  }
+}
+
+function postCard(p) {
+  const card = el("div", { className: "card" });
+  const likeBtn = el("button", {});
+  const cBtn = el("button", {});
+  const box = el("div", { className: "comments hidden" });
+  let loaded = false;
+  let count = p.commentCount;
+
+  const paintLike = () => {
+    likeBtn.textContent = "\u2665 " + p.likeCount;
+    likeBtn.className = p.likedByMe ? "on" : "";
+  };
+  const paintCount = () => { cBtn.textContent = "Comments (" + count + ")"; };
+  paintLike(); paintCount();
+
+  likeBtn.onclick = async () => {
+    likeBtn.disabled = true;
     try {
-      localStorage.removeItem(STORE);
-    } catch (e) {}
-    showLogin();
+      const r = await api(p.likedByMe ? "DELETE" : "PUT", "/posts/" + p.postId + "/like");
+      p.likedByMe = r.liked; p.likeCount = r.likeCount; paintLike();
+    } catch (e) { alert(e.message); }
+    likeBtn.disabled = false;
   };
 
-  (function restore() {
+  cBtn.onclick = async () => {
+    box.classList.toggle("hidden");
+    if (!loaded && !box.classList.contains("hidden")) {
+      loaded = true;
+      await buildComments(box, p, (n) => { count = n; paintCount(); });
+    }
+  };
+
+  const actions = el("div", { className: "actions" }, likeBtn, cBtn);
+  if (p.authorUid === state.user.uid) {
+    actions.append(el("button", {
+      className: "del", textContent: "Delete",
+      onclick: async () => {
+        if (!confirm("Delete this post?")) return;
+        try { await api("DELETE", "/posts/" + p.postId); card.remove(); } catch (e) { alert(e.message); }
+      },
+    }));
+  }
+
+  card.append(el("div", { className: "meta", textContent: (p.authorEmail || short(p.authorUid)) + " \u00b7 " + when(p.createdAt) + (p.privacy === "section" ? " \u00b7 Section " + p.section : "") }));
+  if (p.text) card.append(el("div", { className: "text", textContent: p.text }));
+  if (p.imageUrls && p.imageUrls.length) {
+    card.append(el("div", { className: "imgs" }, p.imageUrls.map((u) => el("img", { src: u, loading: "lazy", alt: "" }))));
+  }
+  card.append(actions, box);
+  return card;
+}
+
+async function buildComments(box, p, setCount) {
+  const list = el("div", {});
+  const err = el("div", { className: "err" });
+  const input = el("input", { type: "text", placeholder: "Write a comment...", maxLength: 1000 });
+  const send = el("button", { className: "primary", textContent: "Send" });
+  const form = el("div", { className: "send" }, input, send);
+  box.append(list, err, form);
+
+  let n = 0;
+  const add = (c) => {
+    n++; setCount(n);
+    list.append(commentRow(c, p, () => { n--; setCount(n); }));
+  };
+
+  try {
+    const data = await api("GET", "/posts/" + p.postId + "/comments");
+    data.comments.forEach(add);
+    if (!data.comments.length) list.append(el("div", { className: "meta", textContent: "No comments yet" }));
+  } catch (e) { err.textContent = e.message; }
+
+  const submit = async () => {
+    const text = input.value.trim();
+    if (!text) return;
+    send.disabled = true; err.textContent = "";
     try {
-      const saved = localStorage.getItem(STORE);
-      if (saved) showProfile(JSON.parse(saved));
-    } catch (e) {}
-  })();
+      const c = await api("POST", "/posts/" + p.postId + "/comments", { text });
+      if (n === 0) list.replaceChildren();
+      add(c);
+      input.value = "";
+    } catch (e) { err.textContent = e.message; }
+    send.disabled = false;
+  };
+  send.onclick = submit;
+  input.onkeydown = (e) => { if (e.key === "Enter") submit(); };
+}
+
+function commentRow(c, p, onRemoved) {
+  const row = el("div", { className: "comment" });
+  const likeBtn = el("button", {});
+  const paint = () => {
+    likeBtn.textContent = "\u2665 " + (c.likeCount || 0);
+    likeBtn.className = c.likedByMe ? "on" : "";
+  };
+  paint();
+  likeBtn.onclick = async () => {
+    likeBtn.disabled = true;
+    try {
+      const r = await api(c.likedByMe ? "DELETE" : "PUT", "/posts/" + p.postId + "/comments/" + c.commentId + "/like");
+      c.likedByMe = r.liked; c.likeCount = r.likeCount; paint();
+    } catch (e) { alert(e.message); }
+    likeBtn.disabled = false;
+  };
+
+  const mine = c.uid === state.user.uid;
+  row.append(el("div", { className: "meta", textContent: (mine ? "You" : short(c.uid)) + " \u00b7 " + when(c.createdAt) }));
+  if (c.text) row.append(el("div", { className: "text", textContent: c.text }));
+  if (c.imageUrl) row.append(el("img", { src: c.imageUrl, loading: "lazy", alt: "" }));
+
+  const bar = el("div", { className: "row" }, likeBtn);
+  if (mine || p.authorUid === state.user.uid) {
+    bar.append(el("button", {
+      className: "del", textContent: "Delete",
+      onclick: async () => {
+        try {
+          await api("DELETE", "/posts/" + p.postId + "/comments/" + c.commentId);
+          row.remove(); onRemoved();
+        } catch (e) { alert(e.message); }
+      },
+    }));
+  }
+  row.append(bar);
+  return row;
+}
+
+$("loginBtn").onclick = login;
+$("logoutBtn").onclick = logout;
+$("moreBtn").onclick = () => loadFeed(false);
+$("password").onkeydown = (e) => { if (e.key === "Enter") login(); };
+
+$("base").value = load("base") || DEFAULT_BASE;
+$("email").value = load("email") || "";
+const saved = load("user");
+if (load("email") && load("password") && saved) {
+  try {
+    state.base = load("base") || DEFAULT_BASE;
+    state.email = load("email");
+    state.password = load("password");
+    state.user = JSON.parse(saved);
+    showApp();
+  } catch (e) { logout(); }
+}
 </script>
 </body>
 </html>
