@@ -40,6 +40,7 @@ KINDS = {
 }
 
 MAX_NAME = 150
+MAX_TRIES = 1000
 BAD_CHARS = set('?&#\\%<>')
 UNSAFE_INLINE = {"text/html", "application/xhtml+xml", "image/svg+xml"}
 
@@ -74,6 +75,15 @@ def clean_name(raw):
 def split_name(name):
     stem, ext = os.path.splitext(name)
     return stem, ext.lstrip(".")
+
+
+def numbered(name, n):
+    if n == 0:
+        return name
+    stem, ext = os.path.splitext(name)
+    suffix = f"-{n}"
+    stem = stem[: MAX_NAME - len(ext) - len(suffix)]
+    return f"{stem}{suffix}{ext}"
 
 
 def public_id(kind, name):
@@ -119,21 +129,27 @@ async def prepare(kind, file: UploadFile):
 
 
 async def store(kind, data, name):
-    if await exists(kind, name):
-        raise HTTPException(status_code=409, detail="File name already exists")
     k = KINDS[kind]
-    pid = public_id(kind, name)
-    async with httpx.AsyncClient(timeout=600) as c:
-        r = await c.post(
-            f"https://api.cloudinary.com/v1_1/{k['cfg']['cloud']}/{k['rtype']}/upload",
-            data={"upload_preset": k["cfg"]["preset"], "public_id": pid},
-            files={"file": (name, data)},
-        )
-    if r.status_code != 200:
-        raise HTTPException(status_code=502, detail="Cloudinary upload failed")
-    if r.json().get("public_id") != pid:
-        raise HTTPException(status_code=502, detail="Cloudinary preset changed the file name")
-    return make_url(kind, name)
+    for n in range(MAX_TRIES):
+        candidate = numbered(name, n)
+        if await exists(kind, candidate):
+            continue
+        pid = public_id(kind, candidate)
+        async with httpx.AsyncClient(timeout=600) as c:
+            r = await c.post(
+                f"https://api.cloudinary.com/v1_1/{k['cfg']['cloud']}/{k['rtype']}/upload",
+                data={"upload_preset": k["cfg"]["preset"], "public_id": pid},
+                files={"file": (candidate, data)},
+            )
+        if r.status_code != 200:
+            raise HTTPException(status_code=502, detail="Cloudinary upload failed")
+        body = r.json()
+        if body.get("existing"):
+            continue
+        if body.get("public_id") != pid:
+            raise HTTPException(status_code=502, detail="Cloudinary preset changed the file name")
+        return make_url(kind, candidate)
+    raise HTTPException(status_code=409, detail="Too many files with this name")
 
 
 @app.get("/")
