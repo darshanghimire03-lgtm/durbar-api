@@ -3,6 +3,7 @@ import re
 import base64
 import secrets
 import mimetypes
+from urllib.parse import quote
 
 import httpx
 from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Request
@@ -33,6 +34,7 @@ FILE = {
 MAX_IMAGE = 32 * 1024 * 1024
 MAX_VIDEO = 100 * 1024 * 1024
 MAX_FILE = 10 * 1024 * 1024
+MAX_NAME = 150
 
 PATTERNS = {
     "img": re.compile(r"i\.ibb\.co(?:\.com)?/[A-Za-z0-9]+/[A-Za-z0-9._-]+"),
@@ -72,13 +74,25 @@ def dec(token):
         raise HTTPException(status_code=404, detail="Not found")
 
 
-def make_url(kind, src, ext):
+def clean_name(raw):
+    name = (raw or "").replace("\\", "/").split("/")[-1]
+    name = "".join(ch for ch in name if ch.isprintable()).strip()
+    if not name:
+        return "file"
+    if len(name) > MAX_NAME:
+        stem, ext = os.path.splitext(name)
+        ext = ext[:20]
+        name = stem[: MAX_NAME - len(ext)] + ext
+    return name
+
+
+def make_url(kind, src, name):
     if not src.startswith("https://"):
         raise HTTPException(status_code=502, detail="Unexpected provider URL")
     path = src[len("https://"):]
     if not PATTERNS[kind].fullmatch(path):
         raise HTTPException(status_code=502, detail="Unexpected provider URL")
-    return f"{PUBLIC_BASE}/{kind}/{enc(path)}.{ext}"
+    return f"{PUBLIC_BASE}/{kind}/{enc(path)}/{quote(name, safe='')}"
 
 
 async def read_upload(file: UploadFile, limit: int):
@@ -87,10 +101,10 @@ async def read_upload(file: UploadFile, limit: int):
         raise HTTPException(status_code=400, detail="Empty file")
     if len(data) > limit:
         raise HTTPException(status_code=413, detail="File too large")
-    name = file.filename or "file"
+    name = clean_name(file.filename)
+    mime = file.content_type or mimetypes.guess_type(name)[0] or "application/octet-stream"
     ext = os.path.splitext(name)[1].lstrip(".").lower()
     ext = "".join(ch for ch in ext if ch.isalnum())[:10]
-    mime = file.content_type or mimetypes.guess_type(name)[0] or "application/octet-stream"
     if not ext:
         ext = (mimetypes.guess_extension(mime) or ".bin").lstrip(".")
     return data, name, ext, mime
@@ -131,7 +145,7 @@ async def upload_image(file: UploadFile = File(...), x_api_key: str = Header(Non
         )
     if r.status_code != 200:
         raise HTTPException(status_code=502, detail="imgbb upload failed")
-    return {"url": make_url("img", r.json()["data"]["url"], ext)}
+    return {"url": make_url("img", r.json()["data"]["url"], name)}
 
 
 @app.post("/upload/video")
@@ -141,7 +155,7 @@ async def upload_video(file: UploadFile = File(...), x_api_key: str = Header(Non
     if not mime.startswith("video/"):
         raise HTTPException(status_code=400, detail="Not a video")
     src = await cloudinary_upload(VID, "video", new_id(), data, name)
-    return {"url": make_url("vid", src, ext)}
+    return {"url": make_url("vid", src, name)}
 
 
 @app.post("/upload/file")
@@ -149,13 +163,10 @@ async def upload_file(file: UploadFile = File(...), x_api_key: str = Header(None
     check_key(x_api_key)
     data, name, ext, mime = await read_upload(file, MAX_FILE)
     src = await cloudinary_upload(FILE, "raw", f"{new_id()}.{ext}", data, name)
-    return {"url": make_url("file", src, ext)}
+    return {"url": make_url("file", src, name)}
 
 
-async def serve(kind: str, filename: str, request: Request):
-    if "." not in filename:
-        raise HTTPException(status_code=404, detail="Not found")
-    token, ext = filename.rsplit(".", 1)
+async def serve(kind: str, token: str, name: str, request: Request):
     path = dec(token)
     if not PATTERNS[kind].fullmatch(path):
         raise HTTPException(status_code=404, detail="Not found")
@@ -172,7 +183,7 @@ async def serve(kind: str, filename: str, request: Request):
         await client.aclose()
         raise HTTPException(status_code=404, detail="Not found")
 
-    mime = mimetypes.guess_type(f"x.{ext.lower()}")[0] or up.headers.get("content-type") or "application/octet-stream"
+    mime = mimetypes.guess_type(name)[0] or up.headers.get("content-type") or "application/octet-stream"
     unsafe = mime in UNSAFE_INLINE
     if unsafe:
         mime = "application/octet-stream"
@@ -189,7 +200,9 @@ async def serve(kind: str, filename: str, request: Request):
     if up.headers.get("content-range"):
         out["Content-Range"] = up.headers["content-range"]
     if kind == "file":
-        out["Content-Disposition"] = f'{"attachment" if unsafe else "inline"}; filename="{filename}"'
+        disposition = "attachment" if unsafe else "inline"
+        fallback = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+        out["Content-Disposition"] = f"{disposition}; filename=\"{fallback}\"; filename*=UTF-8''{quote(name, safe='')}"
 
     async def gen():
         try:
@@ -202,16 +215,31 @@ async def serve(kind: str, filename: str, request: Request):
     return StreamingResponse(gen(), status_code=up.status_code, headers=out)
 
 
-@app.get("/img/{filename}")
-async def get_img(filename: str, request: Request):
-    return await serve("img", filename, request)
+@app.get("/img/{token}/{name}")
+async def get_img(token: str, name: str, request: Request):
+    return await serve("img", token, name, request)
 
 
-@app.get("/vid/{filename}")
-async def get_vid(filename: str, request: Request):
-    return await serve("vid", filename, request)
+@app.get("/vid/{token}/{name}")
+async def get_vid(token: str, name: str, request: Request):
+    return await serve("vid", token, name, request)
 
 
-@app.get("/file/{filename}")
-async def get_file(filename: str, request: Request):
-    return await serve("file", filename, request)
+@app.get("/file/{token}/{name}")
+async def get_file(token: str, name: str, request: Request):
+    return await serve("file", token, name, request)
+
+
+@app.get("/img/{legacy}")
+async def get_img_legacy(legacy: str, request: Request):
+    return await serve("img", legacy.rsplit(".", 1)[0], legacy, request)
+
+
+@app.get("/vid/{legacy}")
+async def get_vid_legacy(legacy: str, request: Request):
+    return await serve("vid", legacy.rsplit(".", 1)[0], legacy, request)
+
+
+@app.get("/file/{legacy}")
+async def get_file_legacy(legacy: str, request: Request):
+    return await serve("file", legacy.rsplit(".", 1)[0], legacy, request)
