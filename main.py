@@ -9,6 +9,8 @@ from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from auth import router as auth_router
+
 
 def need(name):
     value = os.environ.get(name, "").strip()
@@ -52,6 +54,8 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
 )
+
+app.include_router(auth_router)
 
 
 def check_key(key):
