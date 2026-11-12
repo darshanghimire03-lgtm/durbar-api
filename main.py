@@ -3,6 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from auth.login import router as login_router
 from auth.register import router as register_router
+from calender.access import router as calendar_access_router
+from calender.create import router as calendar_create_router
+from post.access import router as post_access_router
+from post.comment import router as post_comment_router
+from post.like import router as post_like_router
+from post.post import router as post_create_router
 from upload.file import router as file_router
 from upload.img import router as img_router
 from upload.vid import router as vid_router
@@ -18,6 +24,12 @@ app.add_middleware(
 
 app.include_router(register_router, prefix="/auth")
 app.include_router(login_router, prefix="/auth")
+app.include_router(calendar_create_router, prefix="/calendar")
+app.include_router(calendar_access_router, prefix="/calendar")
+app.include_router(post_create_router, prefix="/posts")
+app.include_router(post_like_router, prefix="/posts")
+app.include_router(post_comment_router, prefix="/posts")
+app.include_router(post_access_router, prefix="/posts")
 app.include_router(img_router)
 app.include_router(vid_router)
 app.include_router(file_router)

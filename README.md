@@ -1,312 +1,36 @@
-# Durbar Media Backend
+# Durbar API
 
-Image, video and file upload API. Hosted on Render, served through `https://durbar-plus2.vercel.app`.
+Backend for the Durbar app. It does three things:
 
-There is no database and no login. Each upload goes to the storage provider first, and the API returns a link on your own domain.
+- registers and logs in students and professors
+- uploads images, videos and files
+- serves the uploaded files on your own domain
 
-## How it works
+Server: `https://durbar-api-1.onrender.com`
+Public links: `https://durbar-plus2.vercel.app`
 
-- Images are stored on imgbb. Videos and files are stored on separate Cloudinary accounts.
-- After the upload, the provider's URL path is encoded into a token. The returned link is `PUBLIC_BASE_URL/<type>/<token>.<ext>`.
-- When a link is opened, the backend decodes the token, checks that it points to your own provider account, and streams the file back. Range requests work, so video seeking works.
-- Uploads go directly to your Render URL. Only the returned `/img`, `/vid` and `/file` links use the Vercel domain.
+## Project structure
 
-| Type  | View URL                                           |
-|-------|----------------------------------------------------|
-| Image | https://durbar-plus2.vercel.app/img/TOKEN.ext      |
-| Video | https://durbar-plus2.vercel.app/vid/TOKEN.ext      |
-| File  | https://durbar-plus2.vercel.app/file/TOKEN.ext     |
-
-Replace `https://YOUR-SERVICE.onrender.com` below with your real Render URL.
-
-## Limits
-
-| Type  | Max size |
-|-------|----------|
-| Image | 32 MB    |
-| Video | 100 MB   |
-| File  | 10 MB    |
-
-## API
-
-### Upload
-
-| Endpoint             | Field  |
-|----------------------|--------|
-| `POST /upload/image` | `file` |
-| `POST /upload/video` | `file` |
-| `POST /upload/file`  | `file` |
-
-Send as `multipart/form-data`. If `UPLOAD_API_KEY` is set on the server, also send the header `X-API-Key: <key>`.
-
-Response:
-
-```json
-{
-  "url": "https://durbar-plus2.vercel.app/img/aS1kLmliYi5jby9BYjNk.jpg",
-  "id": "aS1kLmliYi5jby9BYjNk",
-  "name": "photo.jpg",
-  "size": 245678
-}
+```
+project/
+├── main.py
+├── requirements.txt
+├── auth/
+│   ├── common.py
+│   ├── register.py
+│   └── login.py
+└── upload/
+    ├── common.py
+    ├── img.py
+    ├── vid.py
+    └── file.py
 ```
 
-Save the returned `url` in your own database (for example in a post or profile) and use it directly.
+Do not add `__init__.py` files.
 
-### Health check
+## Setup
 
-`GET /` returns `{ "ok": true }`.
-
-### View
-
-`GET /img/{token}.{ext}`, `GET /vid/{token}.{ext}` and `GET /file/{token}.{ext}` stream the stored file.
-
-### Errors
-
-Errors return an HTTP status and:
-
-```json
-{ "detail": "File too large" }
-```
-
-Common values: `Invalid API key`, `Empty file`, `File too large`, `Not an image`, `Not a video`, `imgbb upload failed`, `Cloudinary upload failed`, `Unexpected provider URL`, `Not found`.
-
-## Android (Kotlin)
-
-### Dependencies
-
-```gradle
-implementation("com.squareup.okhttp3:okhttp:4.12.0")
-implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-implementation("io.coil-kt:coil:2.6.0")
-implementation("androidx.media3:media3-exoplayer:1.3.1")
-implementation("androidx.media3:media3-ui:1.3.1")
-```
-
-### Permission
-
-```xml
-<uses-permission android:name="android.permission.INTERNET" />
-```
-
-### Api.kt
-
-```kotlin
-import android.content.Context
-import android.net.Uri
-import android.provider.OpenableColumns
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
-import java.util.concurrent.TimeUnit
-
-object Api {
-    const val BASE = "https://YOUR-SERVICE.onrender.com"
-    const val API_KEY = ""
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.MINUTES)
-        .writeTimeout(10, TimeUnit.MINUTES)
-        .build()
-
-    suspend fun upload(context: Context, uri: Uri, type: String): String =
-        withContext(Dispatchers.IO) {
-            val resolver = context.contentResolver
-            val mime = resolver.getType(uri) ?: "application/octet-stream"
-            var name = "file"
-            resolver.query(uri, null, null, null, null)?.use { c ->
-                val i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                if (i >= 0 && c.moveToFirst()) name = c.getString(i)
-            }
-            val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
-                ?: throw Exception("Cannot read file")
-            val body = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("file", name, bytes.toRequestBody(mime.toMediaType()))
-                .build()
-            val builder = Request.Builder().url("$BASE/upload/$type").post(body)
-            if (API_KEY.isNotEmpty()) builder.header("X-API-Key", API_KEY)
-            client.newCall(builder.build()).execute().use { r ->
-                val text = r.body?.string().orEmpty()
-                val obj = if (text.isNotEmpty()) JSONObject(text) else JSONObject()
-                if (!r.isSuccessful) throw Exception(obj.optString("detail", "REQUEST_FAILED"))
-                obj.getString("url")
-            }
-        }
-}
-```
-
-`type` is `image`, `video` or `file`.
-
-### MainActivity.kt
-
-```kotlin
-import android.net.Uri
-import android.os.Bundle
-import android.widget.ImageView
-import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
-import coil.load
-import kotlinx.coroutines.launch
-
-class MainActivity : AppCompatActivity() {
-
-    private lateinit var imageView: ImageView
-
-    private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) uploadMedia(uri, "image")
-    }
-
-    private val pickVideo = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) uploadMedia(uri, "video")
-    }
-
-    private val pickFile = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) uploadMedia(uri, "file")
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        imageView = ImageView(this)
-        setContentView(imageView)
-    }
-
-    private fun uploadMedia(uri: Uri, type: String) {
-        lifecycleScope.launch {
-            try {
-                val url = Api.upload(this@MainActivity, uri, type)
-                if (type == "image") imageView.load(url)
-                Toast.makeText(this@MainActivity, url, Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    private fun chooseImage() = pickImage.launch("image/*")
-    private fun chooseVideo() = pickVideo.launch("video/*")
-    private fun chooseFile() = pickFile.launch("*/*")
-}
-```
-
-### Show an uploaded video
-
-```kotlin
-import androidx.media3.common.MediaItem
-import androidx.media3.exoplayer.ExoPlayer
-
-val player = ExoPlayer.Builder(this).build()
-playerView.player = player
-player.setMediaItem(MediaItem.fromUri(url))
-player.prepare()
-player.play()
-```
-
-### Open or download a file
-
-```kotlin
-import android.content.Intent
-import android.net.Uri
-
-startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-```
-
-## Website (JavaScript)
-
-### api.js
-
-```javascript
-const BASE = "https://YOUR-SERVICE.onrender.com";
-const API_KEY = "";
-
-export async function upload(type, file) {
-  const form = new FormData();
-  form.append("file", file);
-  const headers = API_KEY ? { "X-API-Key": API_KEY } : {};
-  const res = await fetch(BASE + "/upload/" + type, {
-    method: "POST",
-    headers,
-    body: form,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || "REQUEST_FAILED");
-  return data.url;
-}
-```
-
-### Usage
-
-```html
-<input type="file" id="picker">
-<button id="send">Upload image</button>
-<img id="preview" width="300">
-
-<script type="module">
-  import { upload } from "./api.js";
-
-  document.getElementById("send").onclick = async () => {
-    try {
-      const file = document.getElementById("picker").files[0];
-      const url = await upload("image", file);
-      document.getElementById("preview").src = url;
-    } catch (e) {
-      alert(e.message);
-    }
-  };
-</script>
-```
-
-Use `upload("video", file)` for videos and `upload("file", file)` for documents.
-
-### Show media
-
-```html
-<img src="https://durbar-plus2.vercel.app/img/TOKEN.jpg">
-
-<video src="https://durbar-plus2.vercel.app/vid/TOKEN.mp4" controls></video>
-
-<a href="https://durbar-plus2.vercel.app/file/TOKEN.pdf">Download</a>
-```
-
-## Security notes
-
-- `UPLOAD_API_KEY` is optional. If it is empty, anyone who knows your Render URL can upload to your imgbb and Cloudinary accounts.
-- A key placed inside an app or website can be extracted. It stops casual abuse, not a determined attacker.
-- The `/img`, `/vid` and `/file` routes only fetch from your own imgbb and Cloudinary accounts. Tokens pointing anywhere else return 404.
-- HTML and SVG files are never served inline from your domain. They are forced to download.
-- Links created by older versions of this backend (the ones that used a database) no longer work. New uploads do not need any database.
-
-## Rules
-
-- Upload requests go to the Render URL. Never send uploads through Vercel, because Vercel limits request body size.
-- The first request after Render has been idle can take up to a minute on the free tier. Use long timeouts on uploads.
-
-## Deployment
-
-### Render
-
-- Build command: `pip install -r requirements.txt`
-- Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-- Environment variables:
-
-| Name                          | Required | Description                                  |
-|-------------------------------|----------|----------------------------------------------|
-| `IMGBB_KEY`                   | yes      | imgbb API key                                |
-| `CLOUDINARY_VIDEO_CLOUD_NAME` | yes      | Cloudinary cloud name for videos             |
-| `CLOUDINARY_VIDEO_PRESET`     | yes      | Unsigned upload preset for videos            |
-| `CLOUDINARY_FILE_CLOUD_NAME`  | yes      | Cloudinary cloud name for files              |
-| `CLOUDINARY_FILE_PRESET`      | yes      | Unsigned upload preset for files             |
-| `PUBLIC_BASE_URL`             | no       | Defaults to `https://durbar-plus2.vercel.app` |
-| `UPLOAD_API_KEY`              | no       | If set, uploads require `X-API-Key`          |
-
-### requirements.txt
+### 1. requirements.txt
 
 ```
 fastapi
@@ -315,20 +39,209 @@ httpx
 python-multipart
 ```
 
-### Vercel
+### 2. Render
 
-Add this `vercel.json` to the root of the project that hosts `durbar-plus2.vercel.app`, then redeploy:
+- Build command: `pip install -r requirements.txt`
+- Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+Environment variables:
+
+| Name | Required | What it is |
+|---|---|---|
+| `FIREBASE_API_KEY` | yes | Firebase web API key |
+| `FIREBASE_DB_URL` | yes | Realtime Database URL |
+| `CLOUDINARY_VIDEO_CLOUD_NAME` | yes | Cloudinary cloud for videos |
+| `CLOUDINARY_VIDEO_PRESET` | yes | Unsigned preset for videos |
+| `CLOUDINARY_FILE_CLOUD_NAME` | yes | Cloudinary cloud for files |
+| `CLOUDINARY_FILE_PRESET` | yes | Unsigned preset for files |
+| `CLOUDINARY_IMAGE_CLOUD_NAME` | no | Cloud for images (defaults to the file cloud) |
+| `CLOUDINARY_IMAGE_PRESET` | no | Preset for images (defaults to the file preset) |
+| `PUBLIC_BASE_URL` | no | Defaults to `https://durbar-plus2.vercel.app` |
+| `UPLOAD_API_KEY` | no | If set, uploads must send it as `X-API-Key` |
+
+If the server crashes with `Missing environment variable`, add the name it shows.
+
+### 3. Firebase
+
+1. Authentication → Sign-in method → enable **Email/Password**.
+2. Realtime Database → Rules:
+
+```json
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    }
+  }
+}
+```
+
+### 4. Cloudinary presets
+
+Each unsigned upload preset must have an empty "Asset folder" and "Public ID prefix", must not use random or unique file names, and must have overwrite turned off.
+
+### 5. Vercel
+
+Put this `vercel.json` in the project that hosts `durbar-plus2.vercel.app`, then redeploy:
 
 ```json
 {
   "rewrites": [
-    { "source": "/img/:path*", "destination": "https://YOUR-SERVICE.onrender.com/img/:path*" },
-    { "source": "/vid/:path*", "destination": "https://YOUR-SERVICE.onrender.com/vid/:path*" },
-    { "source": "/file/:path*", "destination": "https://YOUR-SERVICE.onrender.com/file/:path*" }
+    { "source": "/img/:path*", "destination": "https://durbar-api-1.onrender.com/img/:path*" },
+    { "source": "/vid/:path*", "destination": "https://durbar-api-1.onrender.com/vid/:path*" },
+    { "source": "/file/:path*", "destination": "https://durbar-api-1.onrender.com/file/:path*" }
   ]
 }
 ```
 
-### Cloudinary
+Send uploads and logins to the Render URL, never through Vercel. Vercel limits request body size.
 
-Create an unsigned upload preset in each Cloudinary account (one for videos, one for files) and put its name in the matching `*_PRESET` variable.
+## How to use
+
+### Register a student
+
+`POST /auth/register`
+
+```json
+{
+  "role": "student",
+  "email": "ram@gmail.com",
+  "password": "secret123",
+  "fullName": "Ram Sharma",
+  "phone": "9812345678",
+  "gender": "male",
+  "profileImageUrl": "https://durbar-plus2.vercel.app/img/ram.jpg",
+  "classLevel": "11",
+  "section": "A"
+}
+```
+
+`classLevel` is optional and defaults to `11`. `section` is `A` or `B`.
+
+### Register a professor
+
+`POST /auth/register`
+
+```json
+{
+  "role": "professor",
+  "email": "sita@gmail.com",
+  "password": "secret123",
+  "fullName": "Sita Karki",
+  "phone": "+9779812345678",
+  "gender": "female",
+  "profileImageUrl": "",
+  "assignedSubject": "Physics"
+}
+```
+
+Professors have a subject. Students have a class level and section. The server ignores any extra fields.
+
+### Login
+
+`POST /auth/login`
+
+```json
+{ "email": "ram@gmail.com", "password": "secret123" }
+```
+
+Register and login both return the saved profile:
+
+```json
+{
+  "uid": "Zk3...",
+  "email": "ram@gmail.com",
+  "fullName": "Ram Sharma",
+  "profileImageUrl": "https://durbar-plus2.vercel.app/img/ram.jpg",
+  "role": "student",
+  "phone": "+9779812345678",
+  "gender": "male",
+  "classLevel": "11",
+  "section": "A",
+  "createdAt": 1731400000000
+}
+```
+
+The app should keep this profile on the device as its logged-in state. No token is returned.
+
+### Rules for registration
+
+- Email must end in `@gmail.com`.
+- Phone: `+977` is added if missing. Other country codes are rejected.
+- Password: at least 6 characters.
+- Gender: `male`, `female` or `other`.
+- `profileImageUrl` must be a link from this server. Upload the picture first, then send the returned link.
+- The `uid` is created by the server. Never send one.
+
+### Upload a file
+
+Send `multipart/form-data` with one field named `file`:
+
+| Type | Endpoint | Limit |
+|---|---|---|
+| Image | `POST /upload/image` | 10 MB |
+| Video | `POST /upload/video` | 100 MB |
+| File | `POST /upload/file` | 10 MB |
+
+If `UPLOAD_API_KEY` is set, also send the header `X-API-Key`.
+
+Response:
+
+```json
+{ "url": "https://durbar-plus2.vercel.app/img/photo.jpg" }
+```
+
+Save this `url` and use it as is. The file keeps the name the app sent. If that name is already taken, a number is added: `photo-1.jpg`, `photo-2.jpg` and so on.
+
+Names that contain `? & # \ % < >` or start with a dot are rejected.
+
+### Show an uploaded file
+
+```html
+<img src="https://durbar-plus2.vercel.app/img/photo.jpg">
+<video src="https://durbar-plus2.vercel.app/vid/clip.mp4" controls></video>
+<a href="https://durbar-plus2.vercel.app/file/notes.pdf">Download</a>
+```
+
+### Typical flow for a new user
+
+1. Upload the profile picture with `/upload/image` and keep the returned `url`.
+2. Call `/auth/register` with that `url` as `profileImageUrl`.
+3. Save the returned profile on the device.
+4. Next time, call `/auth/login`.
+
+## Test pages
+
+- `test.html` tests the three uploads.
+- `login.html` tests login.
+
+Open them in any browser. Both call the Render server directly.
+
+## Errors
+
+Every error has a message you can show to the user:
+
+```json
+{ "detail": "Only @gmail.com emails are accepted" }
+```
+
+| Status | Meaning |
+|---|---|
+| 400 | Bad input (email, phone, name, missing field) |
+| 401 | Wrong email or password, or bad API key |
+| 404 | Profile or file not found |
+| 409 | Email already registered |
+| 413 | File too large |
+| 502 | Firebase or Cloudinary failed |
+
+## Troubleshooting
+
+- **First request is slow:** Render's free tier sleeps when idle. The first call can take up to a minute.
+- **Custom links give 404:** the Vercel rewrites are missing or point to the wrong Render URL. The same path on the Render URL should open the file.
+- **`Email/password sign-in is not enabled`:** turn on Email/Password in Firebase.
+- **`Could not save profile`:** check the Realtime Database rules and `FIREBASE_DB_URL`.
+- **`Cloudinary preset changed the file name`:** remove the folder, prefix and unique-name settings from the preset.
+- **Deploy crashes on `import`:** the `auth/` and `upload/` folders must be pushed in full, with lowercase names.
