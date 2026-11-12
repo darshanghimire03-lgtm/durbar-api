@@ -67,7 +67,7 @@
 </div>
 
 <script>
-const DEFAULT_BASE = "https://durbar-api1.onrender.com";
+const DEFAULT_BASE = "https://durbar-api-1.onrender.com";
 const $ = (id) => document.getElementById(id);
 const state = { base: "", email: "", password: "", user: null, next: null };
 
@@ -118,6 +118,7 @@ async function login() {
   $("loginErr").textContent = "";
   if (!base || !email || !password) { $("loginErr").textContent = "Fill in all fields"; return; }
   $("loginBtn").disabled = true;
+  $("loginBtn").textContent = "Logging in... (server may be waking up)";
   try {
     const res = await fetch(base + "/auth/login", {
       method: "POST",
@@ -138,6 +139,7 @@ async function login() {
     $("loginErr").textContent = e.message === "Failed to fetch" ? "Cannot reach the server" : e.message;
   } finally {
     $("loginBtn").disabled = false;
+    $("loginBtn").textContent = "Log in";
   }
 }
 

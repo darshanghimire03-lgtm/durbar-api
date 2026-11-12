@@ -3,8 +3,6 @@ from typing import Optional
 from fastapi import APIRouter, Header
 
 from post.common import (
-    BATCH,
-    MAX_BATCHES,
     PAGE_MAX,
     as_dict,
     can_see,
@@ -28,37 +26,18 @@ async def feed(
 ):
     uid, token, user = await sign_in(x_email, x_password)
     limit = max(1, min(limit, PAGE_MAX))
-    end = before - 1 if before else None
 
-    items = []
-    next_before = None
-    for _ in range(MAX_BATCHES):
-        params = {"orderBy": '"createdAt"', "limitToLast": BATCH}
-        if end is not None:
-            params["endAt"] = end
-        raw = as_dict(await db_get("posts", token, params))
-        batch = [(k, v) for k, v in raw.items() if isinstance(v, dict)]
-        batch.sort(key=lambda kv: num(kv[1].get("createdAt")), reverse=True)
-        if not batch:
-            next_before = None
-            break
+    raw = as_dict(await db_get("posts", token))
+    posts = [(k, v) for k, v in raw.items() if isinstance(v, dict) and can_see(user, v)]
+    posts.sort(key=lambda kv: num(kv[1].get("createdAt")), reverse=True)
 
-        done = False
-        for post_id, post in batch:
-            if can_see(user, post):
-                items.append(view_post(post_id, post, uid))
-            next_before = num(post.get("createdAt"))
-            if len(items) >= limit:
-                done = True
-                break
-        if done:
-            break
-        if len(raw) < BATCH:
-            next_before = None
-            break
-        end = next_before - 1
+    if before:
+        posts = [kv for kv in posts if num(kv[1].get("createdAt")) < before]
 
-    return {"posts": items, "nextBefore": next_before}
+    page = posts[:limit]
+    next_before = num(page[-1][1].get("createdAt")) if len(posts) > limit else None
+
+    return {"posts": [view_post(k, v, uid) for k, v in page], "nextBefore": next_before}
 
 
 @router.get("/{post_id}")
@@ -66,7 +45,7 @@ async def get_post(post_id: str, x_email: str = Header(None), x_password: str = 
     uid, token, user = await sign_in(x_email, x_password)
     post = await load_post(post_id, token, user)
     result = view_post(post_id, post, uid)
-    result["comments"] = comment_list(post.get("comments"))
+    result["comments"] = comment_list(post.get("comments"), uid)
     return result
 
 
@@ -74,4 +53,4 @@ async def get_post(post_id: str, x_email: str = Header(None), x_password: str = 
 async def get_comments(post_id: str, x_email: str = Header(None), x_password: str = Header(None)):
     uid, token, user = await sign_in(x_email, x_password)
     post = await load_post(post_id, token, user)
-    return {"postId": post_id, "comments": comment_list(post.get("comments"))}
+    return {"postId": post_id, "comments": comment_list(post.get("comments"), uid)}
