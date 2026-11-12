@@ -1,100 +1,80 @@
+const express = require("express");
+const axios = require("axios");
+const FormData = require("form-data");
+const multer = require("multer");
+const { createImageLink } = require("../lib/links");
 
-const { saveLink } = require("../lib/links");
+const router = express.Router();
 
-function makeFilename(originalName) {
-  const ext = originalName.match(/\.[a-zA-Z0-9]+$/)?.[0] || ".jpg";
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024
+  },
+  fileFilter: (req, file, callback) => {
+    if (!file.mimetype.startsWith("image/")) {
+      return callback(new Error("Only image files are allowed"));
+    }
 
-  const base = originalName
-    .replace(/\.[^.]+$/, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-|-$/g, "") || "image";
+    callback(null, true);
+  }
+});
 
-  return `${base}-${Date.now()}${ext.toLowerCase()}`;
-}
-
-module.exports = async function uploadImage(req, res) {
+router.post("/", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "Please provide an image using the file field."
+        message: "Image file is required"
       });
     }
 
-    if (
-      !req.file.mimetype.startsWith("image/") ||
-      req.file.mimetype === "image/svg+xml"
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Only supported image files are allowed."
-      });
-    }
+    const apiKey = process.env.IMGBB_API_KEY;
 
-    const key = process.env.IMGBB_KEY;
-
-    if (!key) {
+    if (!apiKey) {
       return res.status(500).json({
         success: false,
-        message: "IMGBB_KEY is missing."
+        message: "IMGBB_API_KEY environment variable is missing"
       });
     }
 
     const form = new FormData();
 
-    form.append(
-      "image",
-      new Blob([req.file.buffer], {
-        type: req.file.mimetype
-      }),
-      req.file.originalname
-    );
+    form.append("image", req.file.buffer.toString("base64"));
+    form.append("name", req.file.originalname);
 
-    const response = await fetch(
-      `https://api.imgbb.com/1/upload?key=${encodeURIComponent(key)}`,
+    const response = await axios.post(
+      `https://api.imgbb.com/1/upload?key=${apiKey}`,
+      form,
       {
-        method: "POST",
-        body: form
+        headers: form.getHeaders(),
+        timeout: 120000
       }
     );
 
-    const result = await response.json();
-
-    if (!response.ok || !result.success) {
-      return res.status(502).json({
-        success: false,
-        message: result.error?.message || "ImgBB upload failed."
-      });
-    }
-
-    const filename = makeFilename(req.file.originalname);
-
-    const baseUrl = (
-      process.env.PUBLIC_BASE_URL ||
-      "https://durbar-plus2.vercel.app"
-    ).replace(/\/+$/, "");
-
-    const customUrl =
-      `${baseUrl}/img/${encodeURIComponent(filename)}`;
-
-    await saveLink("img", filename, result.data.url);
+    const originalUrl = response.data.data.url;
+    const custom = createImageLink(originalUrl);
 
     return res.status(200).json({
       success: true,
-      message: "Image uploaded successfully.",
-      name: filename,
-      url: customUrl,
-      original_url: result.data.url,
-      thumbnail_url: result.data.thumb?.url || null
+      message: "Image uploaded successfully",
+      type: "image",
+      name: req.file.originalname,
+      url: custom.url,
+      originalUrl,
+      customUrl: true,
+      storage: "ImgBB"
     });
 
   } catch (error) {
-    console.error("Image upload error:", error);
-
     return res.status(500).json({
       success: false,
-      message: "Image upload failed."
+      message:
+        error.response?.data?.error?.message ||
+        error.message ||
+        "Image upload failed"
     });
   }
-};
+});
+
+module.exports = router;

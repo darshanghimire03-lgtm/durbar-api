@@ -1,3 +1,0 @@
-
-# This is a Node.js project.
-# Install dependencies with: npm install
