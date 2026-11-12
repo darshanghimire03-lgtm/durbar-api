@@ -3,264 +3,283 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Durbar API Test</title>
+<title>Durbar Login</title>
 <style>
   * { box-sizing: border-box; }
   body {
     margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: 16px;
     font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     background: #f4f5f7;
     color: #1c1e21;
   }
-  .wrap { max-width: 720px; margin: 0 auto; }
-  h1 { font-size: 20px; margin: 0 0 12px; }
   .card {
-    background: #fff;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 14px;
-    box-shadow: 0 1px 3px rgba(0,0,0,.08);
-  }
-  h2 { font-size: 16px; margin: 0 0 10px; }
-  label { display: block; font-size: 13px; color: #555; margin: 8px 0 4px; }
-  input[type=text], input[type=password] {
     width: 100%;
-    padding: 10px;
+    max-width: 380px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { font-size: 13px; color: #777; margin: 0 0 18px; }
+  label { display: block; font-size: 13px; color: #555; margin: 12px 0 4px; }
+  input {
+    width: 100%;
+    padding: 11px;
     border: 1px solid #ccd0d5;
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 15px;
   }
-  input[type=file] { width: 100%; font-size: 14px; margin: 4px 0 10px; }
+  input:focus { outline: 2px solid #1a73e8; border-color: transparent; }
+  .pass { position: relative; }
+  .pass input { padding-right: 64px; }
+  .toggle {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    color: #1a73e8;
+    padding: 6px 8px;
+    font-size: 13px;
+    width: auto;
+    margin: 0;
+  }
   button {
-    padding: 10px 16px;
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px;
     border: 0;
     border-radius: 8px;
     background: #1a73e8;
     color: #fff;
-    font-size: 14px;
+    font-size: 15px;
     cursor: pointer;
   }
+  button:disabled { opacity: .6; cursor: not-allowed; }
   button.secondary { background: #e4e6eb; color: #1c1e21; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .bar { height: 8px; background: #e4e6eb; border-radius: 4px; overflow: hidden; margin-top: 10px; display: none; }
-  .bar div { height: 100%; width: 0; background: #1a73e8; transition: width .1s; }
-  .status { font-size: 13px; margin-top: 8px; word-break: break-word; }
-  .ok { color: #137333; }
+  .msg { font-size: 13px; margin-top: 12px; min-height: 18px; word-break: break-word; }
   .err { color: #c5221f; }
-  .out { margin-top: 10px; display: none; }
-  .out code {
-    display: block;
-    background: #f1f3f4;
-    padding: 8px;
-    border-radius: 8px;
-    font-size: 12px;
-    word-break: break-all;
-    margin: 4px 0;
+  .ok { color: #137333; }
+  .hint { font-size: 12px; color: #888; margin-top: 14px; text-align: center; }
+  .hidden { display: none; }
+  .profile { text-align: center; }
+  .avatar {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #e4e6eb;
+    margin: 0 auto 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: #777;
+    overflow: hidden;
   }
-  .out img, .out video { max-width: 100%; border-radius: 8px; margin-top: 8px; }
-  .out a { font-size: 13px; }
-  .hint { font-size: 12px; color: #777; margin-top: 6px; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .name { font-size: 20px; font-weight: 600; }
+  .role {
+    display: inline-block;
+    margin: 6px 0 14px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: #e8f0fe;
+    color: #1a73e8;
+    font-size: 12px;
+    text-transform: capitalize;
+  }
+  .rows { text-align: left; border-top: 1px solid #eee; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+  .row span:first-child { color: #777; }
+  .row span:last-child { text-align: right; word-break: break-all; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Durbar API Test</h1>
+<div class="card">
 
-  <div class="card">
-    <h2>Settings</h2>
-    <label for="base">API URL (Render)</label>
-    <input type="text" id="base" value="https://durbar-api-1.onrender.com">
-    <label for="key">API key (only if UPLOAD_API_KEY is set)</label>
-    <input type="password" id="key" placeholder="leave empty if not used">
-    <div class="row" style="margin-top:12px">
-      <button id="ping">Check server</button>
-      <span class="status" id="pingStatus"></span>
+  <div id="loginView">
+    <h1>Login</h1>
+    <p class="sub">Sign in with your Gmail and password</p>
+
+    <label for="email">Email</label>
+    <input id="email" type="email" placeholder="name@gmail.com" autocomplete="username" inputmode="email">
+
+    <label for="password">Password</label>
+    <div class="pass">
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+      <button type="button" class="toggle" id="toggle">Show</button>
     </div>
-    <div class="hint">The first request after idle can take up to a minute on Render's free tier.</div>
+
+    <button id="submit">Login</button>
+    <div class="msg" id="msg"></div>
+    <div class="hint">Server: <span id="serverLabel"></span></div>
   </div>
 
-  <div class="card" data-type="image">
-    <h2>Image</h2>
-    <input type="file" accept="image/*">
-    <button class="send">Upload image</button>
-    <div class="bar"><div></div></div>
-    <div class="status"></div>
-    <div class="out"></div>
+  <div id="profileView" class="hidden profile">
+    <div class="avatar" id="avatar"></div>
+    <div class="name" id="pName"></div>
+    <div class="role" id="pRole"></div>
+    <div class="rows" id="pRows"></div>
+    <button class="secondary" id="logout">Logout</button>
   </div>
 
-  <div class="card" data-type="video">
-    <h2>Video</h2>
-    <input type="file" accept="video/*">
-    <button class="send">Upload video</button>
-    <div class="bar"><div></div></div>
-    <div class="status"></div>
-    <div class="out"></div>
-  </div>
-
-  <div class="card" data-type="file">
-    <h2>File</h2>
-    <input type="file">
-    <button class="send">Upload file</button>
-    <div class="bar"><div></div></div>
-    <div class="status"></div>
-    <div class="out"></div>
-  </div>
 </div>
 
 <script>
-  const baseInput = document.getElementById("base");
-  const keyInput = document.getElementById("key");
-  const pingBtn = document.getElementById("ping");
-  const pingStatus = document.getElementById("pingStatus");
+  const BASE = "https://durbar-api-1.onrender.com";
+  const STORE = "durbar_user";
 
-  function baseUrl() {
-    return baseInput.value.trim().replace(/\/+$/, "");
+  const loginView = document.getElementById("loginView");
+  const profileView = document.getElementById("profileView");
+  const emailEl = document.getElementById("email");
+  const passEl = document.getElementById("password");
+  const toggleEl = document.getElementById("toggle");
+  const submitEl = document.getElementById("submit");
+  const msgEl = document.getElementById("msg");
+  const logoutEl = document.getElementById("logout");
+
+  document.getElementById("serverLabel").textContent = BASE;
+
+  function setMsg(text, cls) {
+    msgEl.textContent = text;
+    msgEl.className = "msg" + (cls ? " " + cls : "");
   }
 
-  function setStatus(el, text, cls) {
-    el.textContent = text;
-    el.className = "status" + (cls ? " " + cls : "");
-  }
-
-  function formatSize(n) {
-    if (n < 1024) return n + " B";
-    if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
-    return (n / 1048576).toFixed(1) + " MB";
-  }
-
-  pingBtn.onclick = async () => {
-    pingBtn.disabled = true;
-    setStatus(pingStatus, "Checking...", "");
-    const start = Date.now();
+  function isHttps(url) {
     try {
-      const res = await fetch(baseUrl() + "/");
-      const data = await res.json();
-      const ms = Date.now() - start;
-      if (res.ok && data.ok) setStatus(pingStatus, "Server OK (" + ms + " ms)", "ok");
-      else setStatus(pingStatus, "Unexpected response", "err");
+      return new URL(url).protocol === "https:";
     } catch (e) {
-      setStatus(pingStatus, "Cannot reach server: " + e.message, "err");
+      return false;
     }
-    pingBtn.disabled = false;
-  };
+  }
 
-  function renderResult(out, type, url, file) {
-    out.innerHTML = "";
-
-    const label = document.createElement("div");
-    label.textContent = "Custom URL";
-    const code = document.createElement("code");
-    code.textContent = url;
-
-    const meta = document.createElement("div");
-    meta.className = "hint";
-    meta.textContent = file.name + " · " + formatSize(file.size);
-
+  function addRow(parent, label, value) {
+    if (value === undefined || value === null || value === "") return;
     const row = document.createElement("div");
     row.className = "row";
-    const copy = document.createElement("button");
-    copy.className = "secondary";
-    copy.textContent = "Copy URL";
-    copy.onclick = async () => {
-      try {
-        await navigator.clipboard.writeText(url);
-        copy.textContent = "Copied";
-        setTimeout(() => (copy.textContent = "Copy URL"), 1500);
-      } catch (e) {
-        copy.textContent = "Copy failed";
-      }
-    };
-    const open = document.createElement("a");
-    open.href = url;
-    open.target = "_blank";
-    open.rel = "noopener";
-    open.textContent = "Open link";
-    row.append(copy, open);
-
-    out.append(label, code, meta, row);
-
-    if (type === "image") {
-      const img = document.createElement("img");
-      img.src = url;
-      img.alt = file.name;
-      out.append(img);
-    } else if (type === "video") {
-      const v = document.createElement("video");
-      v.src = url;
-      v.controls = true;
-      out.append(v);
-    }
-    out.style.display = "block";
+    const a = document.createElement("span");
+    a.textContent = label;
+    const b = document.createElement("span");
+    b.textContent = String(value);
+    row.append(a, b);
+    parent.append(row);
   }
 
-  document.querySelectorAll(".card[data-type]").forEach((card) => {
-    const type = card.dataset.type;
-    const fileInput = card.querySelector("input[type=file]");
-    const btn = card.querySelector(".send");
-    const bar = card.querySelector(".bar");
-    const fill = bar.firstElementChild;
-    const status = card.querySelector(".status");
-    const out = card.querySelector(".out");
-
-    btn.onclick = () => {
-      const file = fileInput.files[0];
-      if (!file) {
-        setStatus(status, "Choose a file first", "err");
-        return;
-      }
-
-      const form = new FormData();
-      form.append("file", file);
-
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", baseUrl() + "/upload/" + type);
-      xhr.timeout = 10 * 60 * 1000;
-      const key = keyInput.value.trim();
-      if (key) xhr.setRequestHeader("X-API-Key", key);
-
-      btn.disabled = true;
-      out.style.display = "none";
-      bar.style.display = "block";
-      fill.style.width = "0";
-      setStatus(status, "Uploading " + file.name + " (" + formatSize(file.size) + ")...", "");
-
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const pct = Math.round((e.loaded / e.total) * 100);
-          fill.style.width = pct + "%";
-          setStatus(status, pct === 100 ? "Processing on provider..." : "Uploading " + pct + "%", "");
-        }
+  function showProfile(user) {
+    const avatar = document.getElementById("avatar");
+    avatar.innerHTML = "";
+    if (user.profileImageUrl && isHttps(user.profileImageUrl)) {
+      const img = document.createElement("img");
+      img.src = user.profileImageUrl;
+      img.alt = "";
+      img.onerror = () => {
+        avatar.textContent = (user.fullName || "?").charAt(0).toUpperCase();
       };
+      avatar.append(img);
+    } else {
+      avatar.textContent = (user.fullName || "?").charAt(0).toUpperCase();
+    }
 
-      xhr.onload = () => {
-        btn.disabled = false;
-        let data = {};
+    document.getElementById("pName").textContent = user.fullName || "";
+    document.getElementById("pRole").textContent = user.role || "";
+
+    const rows = document.getElementById("pRows");
+    rows.innerHTML = "";
+    addRow(rows, "UID", user.uid);
+    addRow(rows, "Email", user.email);
+    addRow(rows, "Phone", user.phone);
+    addRow(rows, "Gender", user.gender);
+    if (user.role === "professor") {
+      addRow(rows, "Subject", user.assignedSubject);
+    } else {
+      addRow(rows, "Class", user.classLevel);
+      addRow(rows, "Section", user.section);
+    }
+    if (user.createdAt) addRow(rows, "Joined", new Date(user.createdAt).toLocaleDateString());
+
+    loginView.classList.add("hidden");
+    profileView.classList.remove("hidden");
+  }
+
+  function showLogin() {
+    profileView.classList.add("hidden");
+    loginView.classList.remove("hidden");
+    passEl.value = "";
+    setMsg("", "");
+  }
+
+  async function doLogin() {
+    const email = emailEl.value.trim().toLowerCase();
+    const password = passEl.value;
+
+    if (!email || !password) {
+      setMsg("Enter email and password", "err");
+      return;
+    }
+    if (!/^[a-z0-9._%+\-]+@gmail\.com$/.test(email)) {
+      setMsg("Only @gmail.com emails are accepted", "err");
+      return;
+    }
+
+    submitEl.disabled = true;
+    setMsg("Signing in... (first request may take up to a minute)", "");
+
+    try {
+      const res = await fetch(BASE + "/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(data.detail || "Login failed (" + res.status + ")", "err");
+      } else {
         try {
-          data = JSON.parse(xhr.responseText);
+          localStorage.setItem(STORE, JSON.stringify(data));
         } catch (e) {}
-        if (xhr.status >= 200 && xhr.status < 300 && data.url) {
-          setStatus(status, "Upload complete", "ok");
-          renderResult(out, type, data.url, file);
-        } else {
-          setStatus(status, "Failed (" + xhr.status + "): " + (data.detail || "REQUEST_FAILED"), "err");
-        }
-      };
+        showProfile(data);
+      }
+    } catch (e) {
+      setMsg("Cannot reach server. Check your connection and try again.", "err");
+    }
 
-      xhr.onerror = () => {
-        btn.disabled = false;
-        setStatus(status, "Network error. Check the API URL and that the server is awake.", "err");
-      };
+    submitEl.disabled = false;
+  }
 
-      xhr.ontimeout = () => {
-        btn.disabled = false;
-        setStatus(status, "Timed out", "err");
-      };
+  toggleEl.onclick = () => {
+    const hidden = passEl.type === "password";
+    passEl.type = hidden ? "text" : "password";
+    toggleEl.textContent = hidden ? "Hide" : "Show";
+  };
 
-      xhr.send(form);
-    };
+  submitEl.onclick = doLogin;
+
+  [emailEl, passEl].forEach((el) => {
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doLogin();
+    });
   });
+
+  logoutEl.onclick = () => {
+    try {
+      localStorage.removeItem(STORE);
+    } catch (e) {}
+    showLogin();
+  };
+
+  (function restore() {
+    try {
+      const saved = localStorage.getItem(STORE);
+      if (saved) showProfile(JSON.parse(saved));
+    } catch (e) {}
+  })();
 </script>
 </body>
 </html>

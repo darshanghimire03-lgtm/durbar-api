@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from .common import bad, db_read, fb_call
+from auth.common import bad, db_read, fb_call
 
 router = APIRouter()
 
