@@ -16,8 +16,14 @@ router = APIRouter()
 
 
 async def unit_count(key, token):
-    ids = await db_get(f"units/{key}", token, {"shallow": "true"})
-    return len(as_dict(ids))
+    try:
+        ids = await db_get(f"units/{key}", token, {"shallow": "true"})
+    except HTTPException:
+        try:
+            ids = await db_get(f"units/{key}", token)
+        except HTTPException:
+            return None
+    return sum(1 for v in as_dict(ids).values() if v)
 
 
 @router.get("")

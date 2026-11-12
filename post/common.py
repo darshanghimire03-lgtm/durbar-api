@@ -70,12 +70,13 @@ async def sign_in(email, password):
 
 
 def guard(r):
+    where = r.request.url.path.removesuffix(".json").lstrip("/")
     if r.status_code in (401, 403):
-        raise HTTPException(status_code=403, detail="Database rules do not allow this action")
+        raise HTTPException(status_code=403, detail=f"Database rules do not allow this action ({where})")
     if r.status_code != 200:
         if "Index not defined" in r.text:
             raise HTTPException(status_code=502, detail="Add .indexOn createdAt to the posts database rules")
-        raise HTTPException(status_code=502, detail="Database request failed")
+        raise HTTPException(status_code=502, detail=f"Database request failed ({where})")
 
 
 async def db_get(path, token, params=None):
