@@ -9,17 +9,25 @@ from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-IMGBB_KEY = os.environ["IMGBB_KEY"]
-PUBLIC_BASE = os.environ.get("PUBLIC_BASE_URL", "https://durbar-plus2.vercel.app").rstrip("/")
-UPLOAD_API_KEY = os.environ.get("UPLOAD_API_KEY", "")
+
+def need(name):
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise RuntimeError(f"Missing environment variable: {name}")
+    return value
+
+
+IMGBB_KEY = need("IMGBB_KEY")
+PUBLIC_BASE = os.environ.get("PUBLIC_BASE_URL", "https://durbar-plus2.vercel.app").strip().rstrip("/")
+UPLOAD_API_KEY = os.environ.get("UPLOAD_API_KEY", "").strip()
 
 VID = {
-    "cloud": os.environ["CLOUDINARY_VIDEO_CLOUD_NAME"],
-    "preset": os.environ["CLOUDINARY_VIDEO_PRESET"],
+    "cloud": need("CLOUDINARY_VIDEO_CLOUD_NAME"),
+    "preset": need("CLOUDINARY_VIDEO_PRESET"),
 }
 FILE = {
-    "cloud": os.environ["CLOUDINARY_FILE_CLOUD_NAME"],
-    "preset": os.environ["CLOUDINARY_FILE_PRESET"],
+    "cloud": need("CLOUDINARY_FILE_CLOUD_NAME"),
+    "preset": need("CLOUDINARY_FILE_PRESET"),
 }
 
 MAX_IMAGE = 32 * 1024 * 1024
@@ -70,8 +78,7 @@ def make_url(kind, src, ext):
     path = src[len("https://"):]
     if not PATTERNS[kind].fullmatch(path):
         raise HTTPException(status_code=502, detail="Unexpected provider URL")
-    token = enc(path)
-    return f"{PUBLIC_BASE}/{kind}/{token}.{ext}", token
+    return f"{PUBLIC_BASE}/{kind}/{enc(path)}.{ext}"
 
 
 async def read_upload(file: UploadFile, limit: int):
@@ -124,8 +131,7 @@ async def upload_image(file: UploadFile = File(...), x_api_key: str = Header(Non
         )
     if r.status_code != 200:
         raise HTTPException(status_code=502, detail="imgbb upload failed")
-    url, token = make_url("img", r.json()["data"]["url"], ext)
-    return {"url": url, "id": token, "name": name, "size": len(data)}
+    return {"url": make_url("img", r.json()["data"]["url"], ext)}
 
 
 @app.post("/upload/video")
@@ -135,8 +141,7 @@ async def upload_video(file: UploadFile = File(...), x_api_key: str = Header(Non
     if not mime.startswith("video/"):
         raise HTTPException(status_code=400, detail="Not a video")
     src = await cloudinary_upload(VID, "video", new_id(), data, name)
-    url, token = make_url("vid", src, ext)
-    return {"url": url, "id": token, "name": name, "size": len(data)}
+    return {"url": make_url("vid", src, ext)}
 
 
 @app.post("/upload/file")
@@ -144,8 +149,7 @@ async def upload_file(file: UploadFile = File(...), x_api_key: str = Header(None
     check_key(x_api_key)
     data, name, ext, mime = await read_upload(file, MAX_FILE)
     src = await cloudinary_upload(FILE, "raw", f"{new_id()}.{ext}", data, name)
-    url, token = make_url("file", src, ext)
-    return {"url": url, "id": token, "name": name, "size": len(data)}
+    return {"url": make_url("file", src, ext)}
 
 
 async def serve(kind: str, filename: str, request: Request):
