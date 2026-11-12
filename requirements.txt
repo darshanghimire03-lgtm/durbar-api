@@ -1,4 +1,3 @@
-fastapi
-uvicorn
-httpx
-python-multipart
+
+# This is a Node.js project.
+# Install dependencies with: npm install
