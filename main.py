@@ -17,6 +17,11 @@ from shorts.access import router as short_access_router
 from shorts.delete import router as short_delete_router
 from shorts.like import router as short_like_router
 from shorts.shorts import router as short_create_router
+from subjects.access import router as subject_access_router
+from subjects.notes.create import router as note_create_router
+from subjects.notes.delete import router as note_delete_router
+from subjects.unit.create import router as unit_create_router
+from subjects.unit.delete import router as unit_delete_router
 from upload.file import router as file_router
 from upload.img import router as img_router
 from upload.vid import router as vid_router
@@ -46,6 +51,11 @@ app.include_router(short_access_router, prefix="/shorts")
 app.include_router(mock_create_router, prefix="/mocks")
 app.include_router(mock_delete_router, prefix="/mocks")
 app.include_router(mock_access_router, prefix="/mocks")
+app.include_router(unit_create_router, prefix="/subjects")
+app.include_router(unit_delete_router, prefix="/subjects")
+app.include_router(note_create_router, prefix="/subjects")
+app.include_router(note_delete_router, prefix="/subjects")
+app.include_router(subject_access_router, prefix="/subjects")
 app.include_router(img_router)
 app.include_router(vid_router)
 app.include_router(file_router)

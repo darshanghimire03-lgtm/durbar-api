@@ -5,13 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Durbar Test</title>
 <style>
-  :root { color-scheme: light dark; --bg:#f4f5f7; --card:#fff; --text:#1d2129; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --danger:#dc2626; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --card:#181b22; --text:#e8eaed; --muted:#9aa0aa; --line:#2a2e38; --accent:#60a5fa; --danger:#f87171; } }
+  :root { color-scheme: light dark; --bg:#f4f5f7; --card:#fff; --text:#1d2129; --muted:#6b7280; --line:#e5e7eb; --accent:#2563eb; --danger:#dc2626; --ok:#16a34a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --card:#181b22; --text:#e8eaed; --muted:#9aa0aa; --line:#2a2e38; --accent:#60a5fa; --danger:#f87171; --ok:#4ade80; } }
   * { box-sizing: border-box; }
   body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
   .wrap { max-width:640px; margin:0 auto; padding:16px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; }
   h1 { font-size:20px; margin:0 0 12px; }
+  h2 { font-size:17px; margin:0 0 10px; }
   input, button { font:inherit; }
   input[type=text], input[type=email], input[type=password], input[type=url] {
     width:100%; padding:10px 12px; margin-bottom:10px; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--text);
@@ -21,8 +22,11 @@
   button:disabled { opacity:.5; cursor:default; }
   button.on { color:var(--danger); border-color:var(--danger); }
   button.del { color:var(--danger); }
-  .bar { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px; }
+  .bar { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; }
   .bar .who { color:var(--muted); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tabs { display:flex; gap:6px; margin-bottom:14px; overflow-x:auto; }
+  .tabs button { flex:1; white-space:nowrap; }
+  .tabs button.active { background:var(--accent); border-color:var(--accent); color:#fff; }
   .meta { color:var(--muted); font-size:13px; }
   .text { white-space:pre-wrap; word-break:break-word; margin:8px 0; }
   .imgs { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:6px; margin:8px 0; }
@@ -38,6 +42,18 @@
   .err { color:var(--danger); font-size:13px; min-height:18px; margin:4px 0; }
   .empty { text-align:center; color:var(--muted); padding:20px; }
   .hidden { display:none; }
+  .center { text-align:center; }
+  .avatar { width:84px; height:84px; border-radius:50%; object-fit:cover; background:var(--line); display:block; margin:0 auto 12px; }
+  .kv { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .kv:last-child { border-bottom:0; }
+  .kv span:first-child { color:var(--muted); }
+  .kv span:last-child { text-align:right; word-break:break-all; }
+  video { width:100%; max-height:70vh; border-radius:8px; background:#000; display:block; }
+  .subject { display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:8px; padding:12px 14px; text-align:left; }
+  .opt { display:block; width:100%; text-align:left; margin-top:8px; padding:10px 12px; }
+  .opt.right { border-color:var(--ok); color:var(--ok); }
+  .opt.wrong { border-color:var(--danger); color:var(--danger); }
+  .score { position:sticky; top:0; z-index:1; }
 </style>
 </head>
 <body>
@@ -57,11 +73,33 @@
       <div class="who" id="who"></div>
       <button id="logoutBtn">Log out</button>
     </div>
-    <div id="feedErr" class="err"></div>
-    <div id="feed"></div>
-    <div style="text-align:center">
-      <button id="moreBtn" class="hidden">Load more</button>
+
+    <div class="tabs" id="tabs">
+      <button data-tab="profile">Profile</button>
+      <button data-tab="feed">Feed</button>
+      <button data-tab="shorts">Shorts</button>
+      <button data-tab="mock">Mock</button>
     </div>
+
+    <section id="tab-profile" class="hidden"></section>
+
+    <section id="tab-feed" class="hidden">
+      <div id="feedErr" class="err"></div>
+      <div id="feed"></div>
+      <div class="center"><button id="feedMore" class="hidden">Load more</button></div>
+    </section>
+
+    <section id="tab-shorts" class="hidden">
+      <div id="shortsErr" class="err"></div>
+      <div id="shorts"></div>
+      <div class="center"><button id="shortsMore" class="hidden">Load more</button></div>
+    </section>
+
+    <section id="tab-mock" class="hidden">
+      <div id="mockErr" class="err"></div>
+      <div id="mockList"></div>
+      <div id="mockQuiz" class="hidden"></div>
+    </section>
   </div>
 
 </div>
@@ -69,7 +107,7 @@
 <script>
 const DEFAULT_BASE = "https://durbar-api-1.onrender.com";
 const $ = (id) => document.getElementById(id);
-const state = { base: "", email: "", password: "", user: null, next: null };
+const state = { base: "", email: "", password: "", user: null, feedNext: null, shortsNext: null, loaded: {} };
 
 function store(key, value) {
   try { value === null ? sessionStorage.removeItem(key) : sessionStorage.setItem(key, value); } catch (e) {}
@@ -143,11 +181,22 @@ async function login() {
   }
 }
 
+function resetData() {
+  state.feedNext = null; state.shortsNext = null; state.loaded = {};
+  ["feed", "shorts", "mockList", "tab-profile"].forEach((id) => $(id).replaceChildren());
+  $("mockQuiz").replaceChildren();
+  $("mockQuiz").classList.add("hidden");
+  $("mockList").classList.remove("hidden");
+  ["feedErr", "shortsErr", "mockErr"].forEach((id) => { $(id).textContent = ""; });
+  $("feedMore").classList.add("hidden");
+  $("shortsMore").classList.add("hidden");
+}
+
 function logout() {
   ["base", "email", "password", "user"].forEach((k) => store(k, null));
-  state.email = ""; state.password = ""; state.user = null; state.next = null;
-  $("feed").replaceChildren();
-  $("feedErr").textContent = "";
+  state.email = ""; state.password = ""; state.user = null;
+  resetData();
+  document.querySelectorAll("video").forEach((v) => v.pause());
   $("appView").classList.add("hidden");
   $("loginView").classList.remove("hidden");
 }
@@ -156,25 +205,64 @@ function showApp() {
   $("loginView").classList.add("hidden");
   $("appView").classList.remove("hidden");
   $("who").textContent = (state.user.fullName || state.user.email) + " (" + state.user.role + ")";
-  $("feed").replaceChildren();
-  state.next = null;
-  loadFeed(true);
+  resetData();
+  openTab("feed");
 }
+
+function openTab(name) {
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  ["profile", "feed", "shorts", "mock"].forEach((t) => $("tab-" + t).classList.toggle("hidden", t !== name));
+  document.querySelectorAll("video").forEach((v) => v.pause());
+  if (state.loaded[name]) return;
+  state.loaded[name] = true;
+  if (name === "profile") renderProfile();
+  if (name === "feed") loadFeed(true);
+  if (name === "shorts") loadShorts(true);
+  if (name === "mock") loadSubjects();
+}
+
+/* ---------- Profile ---------- */
+
+function renderProfile() {
+  const u = state.user;
+  const box = $("tab-profile");
+  const card = el("div", { className: "card" });
+  if (u.profileImageUrl) card.append(el("img", { className: "avatar", src: u.profileImageUrl, alt: "" }));
+  card.append(el("h2", { className: "center", textContent: u.fullName || u.email }));
+  const rows = [
+    ["Role", u.role],
+    ["Email", u.email],
+    ["Phone", u.phone],
+    ["Gender", u.gender],
+    ["Assigned subject", u.assignedSubject],
+    ["Class", u.classLevel],
+    ["Section", u.section],
+    ["Joined", when(u.createdAt)],
+    ["User ID", u.uid],
+  ];
+  rows.forEach(([k, v]) => {
+    if (v) card.append(el("div", { className: "kv" }, el("span", { textContent: k }), el("span", { textContent: String(v) })));
+  });
+  box.append(card);
+}
+
+/* ---------- Feed ---------- */
 
 async function loadFeed(first) {
   $("feedErr").textContent = "";
-  $("moreBtn").disabled = true;
+  $("feedMore").disabled = true;
   try {
-    const q = "?limit=10" + (!first && state.next ? "&before=" + state.next : "");
+    const q = "?limit=10" + (!first && state.feedNext ? "&before=" + state.feedNext : "");
     const data = await api("GET", "/posts" + q);
     data.posts.forEach((p) => $("feed").append(postCard(p)));
     if (first && data.posts.length === 0) $("feed").append(el("div", { className: "empty", textContent: "No posts yet" }));
-    state.next = data.nextBefore;
-    $("moreBtn").classList.toggle("hidden", !state.next);
+    state.feedNext = data.nextBefore;
+    $("feedMore").classList.toggle("hidden", !state.feedNext);
   } catch (e) {
     $("feedErr").textContent = e.message;
+    if (first) state.loaded.feed = false;
   } finally {
-    $("moreBtn").disabled = false;
+    $("feedMore").disabled = false;
   }
 }
 
@@ -304,10 +392,176 @@ function commentRow(c, p, onRemoved) {
   return row;
 }
 
+/* ---------- Shorts ---------- */
+
+async function loadShorts(first) {
+  $("shortsErr").textContent = "";
+  $("shortsMore").disabled = true;
+  try {
+    const q = "?limit=5" + (!first && state.shortsNext ? "&before=" + state.shortsNext : "");
+    const data = await api("GET", "/shorts" + q);
+    data.shorts.forEach((s) => $("shorts").append(shortCard(s)));
+    if (first && data.shorts.length === 0) $("shorts").append(el("div", { className: "empty", textContent: "No shorts yet" }));
+    state.shortsNext = data.nextBefore;
+    $("shortsMore").classList.toggle("hidden", !state.shortsNext);
+  } catch (e) {
+    $("shortsErr").textContent = e.message;
+    if (first) state.loaded.shorts = false;
+  } finally {
+    $("shortsMore").disabled = false;
+  }
+}
+
+function shortCard(s) {
+  const card = el("div", { className: "card" });
+  const video = el("video", { src: s.videoUrl, controls: true, playsInline: true, preload: "metadata" });
+  const viewsEl = el("span", { className: "meta" });
+  const likeBtn = el("button", {});
+  let counted = false;
+
+  const paintViews = () => { viewsEl.textContent = s.views + " views"; };
+  const paintLike = () => {
+    likeBtn.textContent = "\u2665 " + s.likeCount;
+    likeBtn.className = s.likedByMe ? "on" : "";
+  };
+  paintViews(); paintLike();
+
+  video.addEventListener("play", async () => {
+    if (counted) return;
+    counted = true;
+    try {
+      const r = await api("POST", "/shorts/" + s.shortId + "/view");
+      s.views = r.views; paintViews();
+    } catch (e) {}
+  });
+
+  likeBtn.onclick = async () => {
+    likeBtn.disabled = true;
+    try {
+      const r = await api(s.likedByMe ? "DELETE" : "PUT", "/shorts/" + s.shortId + "/like");
+      s.likedByMe = r.liked; s.likeCount = r.likeCount; paintLike();
+    } catch (e) { alert(e.message); }
+    likeBtn.disabled = false;
+  };
+
+  const actions = el("div", { className: "actions" }, likeBtn, viewsEl);
+  if (s.uploaderUid === state.user.uid) {
+    actions.append(el("button", {
+      className: "del", textContent: "Delete",
+      onclick: async () => {
+        if (!confirm("Delete this short?")) return;
+        try { await api("DELETE", "/shorts/" + s.shortId); card.remove(); } catch (e) { alert(e.message); }
+      },
+    }));
+  }
+
+  card.append(
+    el("div", { className: "text", textContent: s.title }),
+    video,
+    el("div", { className: "meta", textContent: short(s.uploaderUid) + " \u00b7 " + when(s.uploadedDate) }),
+    actions
+  );
+  return card;
+}
+
+/* ---------- Mock ---------- */
+
+async function loadSubjects() {
+  $("mockErr").textContent = "";
+  $("mockList").replaceChildren();
+  try {
+    const data = await api("GET", "/mocks");
+    if (!data.subjects.length) {
+      $("mockList").append(el("div", { className: "empty", textContent: "No mock questions yet" }));
+      return;
+    }
+    data.subjects.forEach((s) => {
+      $("mockList").append(el("button", {
+        className: "subject",
+        onclick: () => openSubject(s.subjectKey),
+      }, el("span", { textContent: s.subject }), el("span", { className: "meta", textContent: s.questionCount + " questions" })));
+    });
+  } catch (e) {
+    $("mockErr").textContent = e.message;
+    state.loaded.mock = false;
+  }
+}
+
+async function openSubject(key) {
+  $("mockErr").textContent = "";
+  try {
+    const data = await api("GET", "/mocks/" + key);
+    $("mockList").classList.add("hidden");
+    renderQuiz(data);
+  } catch (e) { $("mockErr").textContent = e.message; }
+}
+
+function renderQuiz(data) {
+  const quiz = $("mockQuiz");
+  quiz.replaceChildren();
+  quiz.classList.remove("hidden");
+
+  const canEdit = ["professor", "moderator"].includes(String(state.user.role).toLowerCase());
+  let total = data.questions.length, answered = 0, correct = 0;
+
+  const score = el("div", { className: "card score" });
+  const paint = () => { score.textContent = data.subject + " \u00b7 Score " + correct + " / " + answered + " answered \u00b7 " + total + " questions"; };
+  paint();
+
+  const back = el("button", {
+    textContent: "\u2190 Subjects",
+    onclick: () => {
+      quiz.classList.add("hidden"); quiz.replaceChildren();
+      $("mockList").classList.remove("hidden");
+      loadSubjects();
+    },
+  });
+  quiz.append(el("div", { style: "margin-bottom:12px" }, back), score);
+
+  data.questions.forEach((q, i) => {
+    const card = el("div", { className: "card" });
+    let done = false, won = false;
+    card.append(el("div", { className: "meta", textContent: "Question " + (i + 1) }));
+    card.append(el("div", { className: "text", textContent: q.question }));
+    if (q.photos.length) card.append(el("div", { className: "imgs" }, q.photos.map((u) => el("img", { src: u, loading: "lazy", alt: "" }))));
+
+    const buttons = q.options.map((text, idx) => {
+      const b = el("button", { className: "opt", textContent: "ABCD"[idx] + ".  " + text });
+      b.onclick = () => {
+        if (done) return;
+        done = true; answered++;
+        if (idx === q.answerIndex) { correct++; won = true; b.classList.add("right"); }
+        else { b.classList.add("wrong"); buttons[q.answerIndex].classList.add("right"); }
+        paint();
+      };
+      return b;
+    });
+    card.append(...buttons);
+
+    if (canEdit) {
+      card.append(el("div", { className: "actions" }, el("button", {
+        className: "del", textContent: "Delete question",
+        onclick: async () => {
+          if (!confirm("Delete this question?")) return;
+          try {
+            await api("DELETE", "/mocks/" + data.subjectKey + "/" + q.questionId);
+            card.remove(); total--; if (done) answered--; if (won) correct--; paint();
+          } catch (e) { alert(e.message); }
+        },
+      })));
+    }
+    quiz.append(card);
+  });
+}
+
+/* ---------- Init ---------- */
+
 $("loginBtn").onclick = login;
 $("logoutBtn").onclick = logout;
-$("moreBtn").onclick = () => loadFeed(false);
+$("feedMore").onclick = () => loadFeed(false);
+$("shortsMore").onclick = () => loadShorts(false);
 $("password").onkeydown = (e) => { if (e.key === "Enter") login(); };
+document.querySelectorAll("#tabs button").forEach((b) => { b.onclick = () => openTab(b.dataset.tab); });
 
 $("base").value = load("base") || DEFAULT_BASE;
 $("email").value = load("email") || "";
